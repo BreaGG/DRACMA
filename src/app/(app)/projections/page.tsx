@@ -40,11 +40,9 @@ export default async function ProjectionsPage({
   const chartData = projection.months.map((m) => ({
     label: monthLabel({ year: m.year, month: m.month }).replace(" 20", " '"),
     income: m.incomeCents,
-    expenses:
-      m.fixedExpensesCents +
-      m.variableExpensesCents +
-      m.debtPaymentsCents +
-      m.installmentPaymentsCents,
+    fixed: m.fixedExpensesCents,
+    variable: m.variableExpensesCents,
+    debtPayments: m.debtPaymentsCents + m.installmentPaymentsCents,
     balance: m.endingBalanceCents,
     debt: m.totalDebtCents,
     savings: m.totalSavingsCents,
@@ -114,7 +112,15 @@ export default async function ProjectionsPage({
             <CardTitle>Cash flow</CardTitle>
           </CardHeader>
           <CardContent>
-            <CashFlowChart data={chartData} />
+            <CashFlowChart
+              data={chartData.map((m) => ({
+                label: m.label,
+                income: m.income,
+                fixed: m.fixed,
+                variable: m.variable,
+                debt: m.debtPayments,
+              }))}
+            />
           </CardContent>
         </Card>
         <Card>

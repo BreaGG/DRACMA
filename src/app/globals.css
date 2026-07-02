@@ -22,6 +22,7 @@
   --chart-cash: #2a78d6;
   --chart-income: #1baf7a;
   --chart-expense: #e34948;
+  --chart-expense-variable: #eda100;
   --chart-debt: #eb6834;
   --chart-savings: #4a3aa7;
   --chart-networth: #008300;
@@ -49,6 +50,7 @@
   --chart-cash: #3987e5;
   --chart-income: #199e70;
   --chart-expense: #e66767;
+  --chart-expense-variable: #c98500;
   --chart-debt: #d95926;
   --chart-savings: #9085e9;
   --chart-networth: #0ca30c;
@@ -73,6 +75,7 @@
   --color-chart-cash: var(--chart-cash);
   --color-chart-income: var(--chart-income);
   --color-chart-expense: var(--chart-expense);
+  --color-chart-expense-variable: var(--chart-expense-variable);
   --color-chart-debt: var(--chart-debt);
   --color-chart-savings: var(--chart-savings);
   --color-chart-networth: var(--chart-networth);

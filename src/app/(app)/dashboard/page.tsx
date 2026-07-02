@@ -46,11 +46,9 @@ export default async function DashboardPage() {
   const chartMonths = projection.months.map((m) => ({
     label: monthLabel({ year: m.year, month: m.month }).replace(" 20", " '"),
     income: m.incomeCents,
-    expenses:
-      m.fixedExpensesCents +
-      m.variableExpensesCents +
-      m.debtPaymentsCents +
-      m.installmentPaymentsCents,
+    fixedExpenses: m.fixedExpensesCents,
+    variableExpenses: m.variableExpensesCents,
+    debtPayments: m.debtPaymentsCents + m.installmentPaymentsCents,
     debt: m.totalDebtCents,
     savings: m.totalSavingsCents,
   }));
@@ -127,7 +125,13 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <CashFlowChart
-              data={chartMonths.map((m) => ({ label: m.label, income: m.income, expenses: m.expenses }))}
+              data={chartMonths.map((m) => ({
+                label: m.label,
+                income: m.income,
+                fixed: m.fixedExpenses,
+                variable: m.variableExpenses,
+                debt: m.debtPayments,
+              }))}
             />
           </CardContent>
         </Card>

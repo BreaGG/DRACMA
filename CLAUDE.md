@@ -27,8 +27,8 @@ Personal finance app. Next.js App Router + TS strict + Tailwind v4 + Prisma 7
 - Server actions in `src/server/actions/` re-validate with Zod schemas from
   `src/lib/validators.ts` and always scope queries by `userId` from
   `requireUserId()`.
-- Chart colors are fixed per entity (cash=blue, income=aqua, expense=red,
-  debt=orange, savings=violet, net worth=green) via CSS vars in
-  `globals.css` — don't reassign per chart.
+- Chart colors are fixed per entity (cash=blue, income=aqua, fixed
+  expenses=red, variable expenses=yellow, debt=orange, savings=violet,
+  net worth=green) via CSS vars in `globals.css` — don't reassign per chart.
 - Next 16: route guard file is `src/proxy.ts` (the middleware convention is
   deprecated).
