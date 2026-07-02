@@ -68,6 +68,41 @@ covered by unit tests:
 npm test
 ```
 
+## Deploy to Railway
+
+The repo ships ready for [Railway](https://railway.com): `railway.json`
+configures the build, runs `prisma migrate deploy` before each release, and
+points the healthcheck at `/api/health`. `postinstall` regenerates the Prisma
+client on every install, and Auth.js is configured with `trustHost` for
+Railway's proxy.
+
+1. **Create the project.** Railway dashboard → *New Project* →
+   *Deploy from GitHub repo* → select this repository. The first build will
+   fail until the variables below exist — that's expected.
+2. **Add PostgreSQL.** In the project canvas: *Create* → *Database* →
+   *PostgreSQL*.
+3. **Set the app service variables** (app service → *Variables*):
+
+   | Variable | Value |
+   |---|---|
+   | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (reference to the Postgres service) |
+   | `AUTH_SECRET` | output of `openssl rand -base64 32` |
+
+4. **Redeploy.** The pre-deploy step applies migrations, then the app starts
+   and the deploy goes healthy once `/api/health` responds.
+5. **Expose it.** App service → *Settings* → *Networking* →
+   *Generate Domain* (or attach a custom domain).
+6. **Optional — demo data.** Registration works out of the box; to load the
+   demo user instead, run the seed from your machine against the database's
+   **public** URL (Postgres service → *Variables* → `DATABASE_PUBLIC_URL`):
+
+   ```bash
+   DATABASE_URL="<DATABASE_PUBLIC_URL>" npx prisma db seed
+   ```
+
+Every push to the connected branch triggers a new deploy; migrations run
+automatically before the new version goes live.
+
 ## Architecture
 
 ```

@@ -12,6 +12,9 @@ const credentialsSchema = z.object({
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
+  // The app always runs behind a trusted reverse proxy in production
+  // (Railway edge), which sets x-forwarded-host / x-forwarded-proto.
+  trustHost: true,
   providers: [
     Credentials({
       credentials: {
