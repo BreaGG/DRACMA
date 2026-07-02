@@ -1,0 +1,357 @@
+// DRACMA — personal finance data model.
+// All monetary amounts are stored as integer cents to avoid floating-point errors.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum AccountType {
+  CHECKING
+  SAVINGS
+  CASH
+  DIGITAL // Revolut / Wise / N26 ...
+  CREDIT_CARD
+  PAYPAL
+  INVESTMENT
+  OTHER
+}
+
+enum Frequency {
+  MONTHLY
+  WEEKLY
+  YEARLY
+  ONE_TIME
+}
+
+enum CategoryKind {
+  INCOME
+  EXPENSE
+}
+
+enum ExpenseKind {
+  FIXED // recurring bill with a known amount and day (rent, subscriptions)
+  VARIABLE // monthly estimate for fluctuating spending (food, transport)
+}
+
+enum DebtType {
+  BANK_LOAN
+  PERSONAL_LOAN
+  CREDIT_CARD
+  PAYPAL_PAY_IN_3
+  BNPL
+  INFORMAL
+  OTHER
+}
+
+enum DebtStatus {
+  ACTIVE
+  PAID
+  PAUSED
+}
+
+enum PlanStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+}
+
+enum GoalPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum GoalStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+  TRANSFER
+  DEBT_PAYMENT
+  SAVINGS_CONTRIBUTION
+}
+
+// ---------------------------------------------------------------------------
+// Core entities
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  currency     String   @default("EUR")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  accounts        Account[]
+  categories      Category[]
+  incomeSources   IncomeSource[]
+  expenses        Expense[]
+  debts           Debt[]
+  installmentPlans InstallmentPlan[]
+  savingsGoals    SavingsGoal[]
+  transactions    Transaction[]
+  scenarios       Scenario[]
+  snapshots       ProjectionSnapshot[]
+}
+
+model Account {
+  id              String      @id @default(cuid())
+  userId          String
+  name            String
+  type            AccountType
+  balanceCents    Int         @default(0)
+  currency        String      @default("EUR")
+  notes           String?
+  countsAsCash    Boolean     @default(true) // counts toward available cash
+  countsAsSavings Boolean     @default(false) // counts toward savings
+  inNetWorth      Boolean     @default(true) // counts toward net worth
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  incomeSources    IncomeSource[]
+  expenses         Expense[]
+  debts            Debt[]
+  installmentPlans InstallmentPlan[]
+  savingsGoals     SavingsGoal[]
+  transactions     Transaction[]     @relation("AccountTransactions")
+  transfersIn      Transaction[]     @relation("TransferTarget")
+
+  @@index([userId])
+}
+
+model Category {
+  id        String       @id @default(cuid())
+  userId    String
+  name      String
+  kind      CategoryKind
+  isDefault Boolean      @default(false)
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  incomeSources IncomeSource[]
+  expenses      Expense[]
+  transactions  Transaction[]
+
+  @@unique([userId, name, kind])
+  @@index([userId])
+}
+
+model IncomeSource {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  amountCents Int
+  frequency   Frequency @default(MONTHLY)
+  paymentDay  Int       @default(1) // day of month (clamped to month length)
+  accountId   String?
+  categoryId  String?
+  startDate   DateTime
+  endDate     DateTime?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account  Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
+
+model Expense {
+  id          String      @id @default(cuid())
+  userId      String
+  name        String
+  amountCents Int
+  kind        ExpenseKind @default(FIXED)
+  frequency   Frequency   @default(MONTHLY)
+  paymentDay  Int         @default(1)
+  accountId   String?
+  categoryId  String?
+  isEssential Boolean     @default(true)
+  startDate   DateTime
+  endDate     DateTime?
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account  Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
+
+model Debt {
+  id                  String     @id @default(cuid())
+  userId              String
+  name                String
+  type                DebtType   @default(PERSONAL_LOAN)
+  originalAmountCents Int
+  balanceCents        Int // current remaining balance
+  interestRateBps     Int        @default(0) // annual rate in basis points (350 = 3.5%)
+  monthlyPaymentCents Int
+  paymentDay          Int        @default(1)
+  startDate           DateTime
+  expectedEndDate     DateTime?
+  lender              String?
+  accountId           String?
+  notes               String?
+  status              DebtStatus @default(ACTIVE)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account      Account?      @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  payments     DebtPayment[]
+  transactions Transaction[]
+
+  @@index([userId])
+}
+
+model DebtPayment {
+  id             String   @id @default(cuid())
+  debtId         String
+  date           DateTime
+  amountCents    Int
+  principalCents Int
+  interestCents  Int      @default(0)
+  createdAt      DateTime @default(now())
+
+  debt Debt @relation(fields: [debtId], references: [id], onDelete: Cascade)
+
+  @@index([debtId])
+}
+
+model InstallmentPlan {
+  id                    String     @id @default(cuid())
+  userId                String
+  name                  String // purchase name, e.g. "Laptop"
+  provider              String     @default("PayPal Pay in 3")
+  totalAmountCents      Int
+  installmentCount      Int
+  installmentAmountCents Int
+  firstPaymentDate      DateTime
+  accountId             String?
+  notes                 String?
+  status                PlanStatus @default(ACTIVE)
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account  Account?             @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  payments InstallmentPayment[]
+
+  @@index([userId])
+}
+
+model InstallmentPayment {
+  id          String        @id @default(cuid())
+  planId      String
+  sequence    Int // 1-based installment number
+  dueDate     DateTime
+  amountCents Int
+  status      PaymentStatus @default(PENDING)
+  paidAt      DateTime?
+
+  plan InstallmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, sequence])
+  @@index([planId])
+}
+
+model SavingsGoal {
+  id                       String       @id @default(cuid())
+  userId                   String
+  name                     String
+  targetCents              Int
+  currentCents             Int          @default(0)
+  monthlyContributionCents Int          @default(0)
+  targetDate               DateTime?
+  priority                 GoalPriority @default(MEDIUM)
+  accountId                String?
+  notes                    String?
+  status                   GoalStatus   @default(ACTIVE)
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account      Account?      @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  transactions Transaction[]
+
+  @@index([userId])
+}
+
+model Transaction {
+  id            String          @id @default(cuid())
+  userId        String
+  date          DateTime
+  amountCents   Int // always positive; type determines direction
+  type          TransactionType
+  accountId     String
+  toAccountId   String? // for transfers
+  categoryId    String?
+  debtId        String?
+  savingsGoalId String?
+  description   String
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account     Account      @relation("AccountTransactions", fields: [accountId], references: [id], onDelete: Cascade)
+  toAccount   Account?     @relation("TransferTarget", fields: [toAccountId], references: [id], onDelete: SetNull)
+  category    Category?    @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  debt        Debt?        @relation(fields: [debtId], references: [id], onDelete: SetNull)
+  savingsGoal SavingsGoal? @relation(fields: [savingsGoalId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date])
+  @@index([accountId])
+}
+
+model Scenario {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  changes     Json // array of ScenarioChange objects (typed in src/lib/finance/scenario.ts)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ProjectionSnapshot {
+  id        String   @id @default(cuid())
+  userId    String
+  label     String?
+  months    Int
+  data      Json // serialized ProjectionResult
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
